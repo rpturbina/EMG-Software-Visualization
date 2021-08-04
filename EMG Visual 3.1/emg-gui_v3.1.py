@@ -370,7 +370,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
             Ui_MainWindow.ptr += 1
             self.curve1.setData(Ui_MainWindow.Xm)
             self.curve1.setPos(Ui_MainWindow.ptr, 0)
-            QtGui.QApplication.processEvents()
+            QtWidgets.QApplication.processEvents()
             Ui_MainWindow.rwdt.append(emg_float)
             Ui_MainWindow.dte.append(time.strftime("%d-%b-%Y"))
             Ui_MainWindow.tme.append(time.strftime("%H:%M:%S"))
