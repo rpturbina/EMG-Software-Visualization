@@ -657,7 +657,7 @@ if __name__ == "__main__":
              if 'Arduino' in p.description]
     if not ports:
         raise IOError("No Arduino found")
-    board = pyfirmata.Arduino(ports[0], baudrate=9600)
+    board = pyfirmata.Arduino(ports[0], baudrate=57600)
     iterator = pyfirmata.util.Iterator(board)
     iterator.start()
     analog_input = board.get_pin('a:0:i')
