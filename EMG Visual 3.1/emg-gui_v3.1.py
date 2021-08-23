@@ -532,7 +532,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         plt.subplot(2, 1, 2)
         plt.plot(self.t, self.y_f, 'g-',
                  linewidth=1, label='filtered signal')
-        plt.title('Filtered Signal (Cutoff Freqeuncy ' +
+        plt.title('Filtered Signal (Cutoff Frequency ' +
                   str(ui.cutoff) + ' Hz)')
         plt.xlabel('Time [sec]')
         plt.ylabel('Voltage [V]')
@@ -657,7 +657,7 @@ if __name__ == "__main__":
              if 'Arduino' in p.description]
     if not ports:
         raise IOError("No Arduino found")
-    board = pyfirmata.Arduino(ports[0], baudrate=57600)
+    board = pyfirmata.Arduino(ports[0], baudrate=9600)
     iterator = pyfirmata.util.Iterator(board)
     iterator.start()
     analog_input = board.get_pin('a:0:i')
