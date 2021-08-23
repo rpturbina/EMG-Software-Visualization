@@ -386,14 +386,14 @@ class Ui_MainWindow(QtWidgets.QWidget):
         return self.T, self.sps
 
     # set digital filter
-    def butter_lowpass(self, cutoff, fs, order=5):
+    def butter_lowpass(self, cutoff, fs, order):
         nyq = 0.5 * fs
         normal_cutoff = cutoff / nyq
         b, a = butter(order, normal_cutoff, btype='low', analog=False)
         return b, a
 
-    def butter_lowpass_filter(self, data, cutoff, fs, order=5):
-        b, a = self.butter_lowpass(cutoff, fs, order=order)
+    def butter_lowpass_filter(self, data, cutoff, fs, order):
+        b, a = self.butter_lowpass(cutoff, fs, order)
         y = filtfilt(b, a, data)
         return y
 
