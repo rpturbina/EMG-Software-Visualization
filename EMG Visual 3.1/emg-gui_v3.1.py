@@ -645,8 +645,6 @@ class Ui_MainWindow(QtWidgets.QWidget):
         self.t_read = np.linspace(
             0, self.retrieval_time, self.number_sample, endpoint=False)
 
-    # fft analyzer
-
 
 if __name__ == "__main__":
     import sys
