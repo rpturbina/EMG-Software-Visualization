@@ -426,7 +426,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         self.p1.enableAutoRange(enable=True)
         self.p1.setLimits(xMin=0, xMax=None, yMin=0, yMax=5)
         self.labelStatus.setText("Status : Updating EMG signal")
-        print("Logging started.")
+        print("\n" + "Logging started.")
         self.start = time.time()
         while self.condition:
             self.read_arduino_update(analog_input)
@@ -440,12 +440,9 @@ class Ui_MainWindow(QtWidgets.QWidget):
                 " ".join(["Elapsed Time :",
                           str("%.2f" % (self.now - self.start)),
                           "seconds"]))
-            # print(self.now - self.start)
-            # if str("%.2f" % (self.now - self.start)) == "15.00":
-            #     self.condition = 0
+        print("\n" + "Logging stopped.")
         self.end = time.time()
         self.T, self.sps = self.sampling_rate()
-        print("Logging stopped.")
         self.y_f = self.filter_signal()
 
     # Set stop button
@@ -487,7 +484,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         self.fileName.setEnabled(False)
         self.savePlotButton.setEnabled(False)
         self.singlePlotButton.setEnabled(False)
-        print("Datalog cleared.")
+        print("\n" + "Datalog cleared.")
 
     # Set Save Plot Button
     def save_plot_button(self):
@@ -513,8 +510,11 @@ class Ui_MainWindow(QtWidgets.QWidget):
         filename = self.fileName.text() + ".csv"
         df.to_csv("/".join([dirName, filename]))
         self.labelStatus.setText("Status : CSV File Saved")
+        print("\n" + "Filename: " + filename)
+        print("CSV File saved at " + dirName)
 
     # Set Single Plot Button
+
     def single_plot_button(self):
         self.labelStatus.setText("Status : EMG Signal plotted on Matplotlib")
         plt.ion()
@@ -647,8 +647,8 @@ class Ui_MainWindow(QtWidgets.QWidget):
 
 
 if __name__ == "__main__":
-    import sys
     print("Initializing the program...")
+    import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
@@ -665,3 +665,4 @@ if __name__ == "__main__":
     analog_input = board.get_pin('a:0:i')
     ui.arduino_ready()
     sys.exit(app.exec_())
+    print("Program is closed.")
