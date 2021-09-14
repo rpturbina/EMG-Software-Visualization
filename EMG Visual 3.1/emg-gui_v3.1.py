@@ -648,6 +648,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
 
 if __name__ == "__main__":
     import sys
+    print("Initializing the program...")
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
@@ -660,6 +661,7 @@ if __name__ == "__main__":
     board = pyfirmata.Arduino(ports[0], baudrate=9600)
     iterator = pyfirmata.util.Iterator(board)
     iterator.start()
+    print("Program is ready to use.")
     analog_input = board.get_pin('a:0:i')
     ui.arduino_ready()
     sys.exit(app.exec_())
