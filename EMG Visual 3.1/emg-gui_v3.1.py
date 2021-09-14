@@ -518,7 +518,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
     def single_plot_button(self):
         self.labelStatus.setText("Status : EMG Signal plotted on Matplotlib")
         plt.ion()
-        plt.gcf().canvas.set_window_title('Single Plot EMG Signal')
+        plt.gcf().canvas.manager.set_window_title('Single Plot EMG Signal')
         plt.subplot(2, 1, 1)
         plt.plot(self.t, self.data,
                  'b-', linewidth=1, label='unfiltered signal')
@@ -540,14 +540,16 @@ class Ui_MainWindow(QtWidgets.QWidget):
         plt.grid(True, alpha=0.6)
         plt.legend()
         plt.subplots_adjust(hspace=0.35)
+        print("\nData plotted.")
 
     # Set Multiple Plot Button
+
     def multiple_plot_button(self):
         self.labelStatus.setText(
             "Status : Multiple or single signal plotted on Matplotlib"
         )
         plt.ion()
-        plt.gcf().canvas.set_window_title('Single/Multiple Plot EMG Signals')
+        plt.gcf().canvas.manager.set_window_title('Single/Multiple Plot EMG Signals')
         if self.fileSelect_1.text() != "":
             dirName = self.fileSelect_1.text()
             # csvName = dirName.split("/")
@@ -597,6 +599,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         plt.grid(True, alpha=0.6)
         plt.legend()
         plt.subplots_adjust(hspace=0.35)
+        print("\nData plotted.")
 
     # Set Select File BUtton
     def select_file_button_1(self):
@@ -607,6 +610,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
             'CSV file (*.csv)')
         self.fileSelect_1.setText(fileName[0])
         self.multiPlotButton.setEnabled(True)
+        print("\nSelected file: " + fileName[0])
 
     def select_file_button_2(self):
         self.labelStatus.setText("Status : Select CSV file to plot")
@@ -665,4 +669,3 @@ if __name__ == "__main__":
     analog_input = board.get_pin('a:0:i')
     ui.arduino_ready()
     sys.exit(app.exec_())
-    print("Program is closed.")
