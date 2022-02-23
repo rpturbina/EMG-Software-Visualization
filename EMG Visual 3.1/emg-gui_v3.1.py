@@ -633,7 +633,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
     # read saved csv
     def read_csv_files(self, dirName):
         df = pd.read_csv(dirName)
-        # read non filtered emg value column
+        # read non filter`ed emg value column
         nonfilt_value = df["EMG Value (V)"]
         nonfilt_value = nonfilt_value.drop(nonfilt_value.tail(1).index)
         nonfilt_value = nonfilt_value.astype(float)
