@@ -1,12 +1,14 @@
 # by rpturbina, EMG Measurement System Project
 # -*- coding: utf-8 -*-
 
+from array import array
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph import GraphicsLayoutWidget
 import pyfirmata
 import numpy as np
 import pandas as pd
 import time
+import math
 import pyqtgraph as pg
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
@@ -14,7 +16,22 @@ import os
 import serial.tools.list_ports
 
 
+def rmsValue(arr, n):
+    square = 0
+    mean = 0.0
+    root = 0.0
+    # Calculate square
+    for i in range(0, n):
+        square += (arr[i]**2)
+    # Calculate Mean
+    mean = (square / (float)(n))
+    # Calculate Root
+    root = math.sqrt(mean)
+    return root
+
 # Combo Box Pop Up
+
+
 class ComboBox(QtWidgets.QComboBox):
     popupAboutToBeShown = QtCore.pyqtSignal()
 
@@ -27,8 +44,9 @@ class Ui_MainWindow(QtWidgets.QWidget):
 
     rwdt, dte, tme = [], [], []  # temporary place for emg & datetime data
     SENSORGAIN = 89.553  # sensorgain value
-    windowWidth = 1000  # width of plot graph
+    windowWidth = 2000  # width of plot graph
     cutoff = 2  # desired cutoff frequency of the filter, Hz
+    rmsVariable = 0  # initial rms value
     Xm = np.linspace(0, 0, windowWidth)
     Ym = np.linspace(0, 0, windowWidth)
     ptr = -windowWidth
@@ -51,8 +69,8 @@ class Ui_MainWindow(QtWidgets.QWidget):
 
         self.graphicsView = GraphicsLayoutWidget(self.centralwidget)
         self.p1 = self.graphicsView.addPlot(title="EMG Realtime Signal")
-        self.p1.setLabel('bottom', 'Number of Sample')
-        self.p1.setLabel('left', 'Voltage', units='V')
+        self.p1.setLabel('bottom', 'Time', units='second')
+        self.p1.setLabel('left', 'Voltage', units='volt')
         self.p1.showGrid(x=True, y=True, alpha=0.5)
         self.curve1 = self.p1.plot(pen=(0, 255, 0))
         pg.setConfigOptions(antialias=True)
@@ -60,20 +78,21 @@ class Ui_MainWindow(QtWidgets.QWidget):
 
         self.gridLayout_1 = QtWidgets.QGridLayout()
         self.labelDataSample = QtWidgets.QLabel(self.centralwidget)
-        self.gridLayout_1.addWidget(self.labelDataSample, 0, 0, 1, 1)
+        self.labelDataSample.setAlignment(QtCore.Qt.AlignCenter)
+        self.gridLayout_1.addWidget(self.labelDataSample, 0, 2, 1, 1)
         self.labelStatus = QtWidgets.QLabel(self.centralwidget)
-        self.labelStatus.setAlignment(QtCore.Qt.AlignCenter)
-        self.gridLayout_1.addWidget(self.labelStatus, 0, 1, 1, 1)
+        self.labelStatus.setAlignment(QtCore.Qt.AlignLeft)
+        self.gridLayout_1.addWidget(self.labelStatus, 0, 0, 1, 1)
         self.labelElapsedtime = QtWidgets.QLabel(self.centralwidget)
-        self.labelElapsedtime.setAlignment(
-            QtCore.Qt.AlignRight |
-            QtCore.Qt.AlignTrailing |
-            QtCore.Qt.AlignVCenter)
-        self.gridLayout_1.addWidget(self.labelElapsedtime, 0, 2, 1, 1)
+        self.labelElapsedtime.setAlignment(QtCore.Qt.AlignCenter)
+        self.gridLayout_1.addWidget(self.labelElapsedtime, 0, 1, 1, 1)
+        self.labelRMSValue = QtWidgets.QLabel(self.centralwidget)
+        self.labelRMSValue.setAlignment(QtCore.Qt.AlignRight)
+        self.gridLayout_1.addWidget(self.labelRMSValue, 0, 3, 1, 1)
         self.line_1 = QtWidgets.QFrame(self.centralwidget)
         self.line_1.setFrameShape(QtWidgets.QFrame.HLine)
         self.line_1.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.gridLayout_1.addWidget(self.line_1, 1, 0, 1, 3)
+        self.gridLayout_1.addWidget(self.line_1, 1, 0, 1, 4)
         self.verticalLayout.addLayout(self.gridLayout_1)
 
         font = QtGui.QFont()
@@ -238,7 +257,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         MainWindow.setStatusBar(self.statusBar)
 
         self.fileName.setText("".join([time.strftime(
-                                       "%Y-%m-%d-%H.%M.%S"), "-data-"]))
+                                       "%Y-%m-%d-%H.%M.%S"), "-"]))
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -253,11 +272,13 @@ class Ui_MainWindow(QtWidgets.QWidget):
                        "Number of data samples received"))
         self.labelDataSample.setText(
             _translate("MainWindow",
-                       "Data Samples : 0 samples received"))
+                       "Data Samples : - samples received"))
         self.labelStatus.setText(_translate(
             "MainWindow", "Status : Waiting for Arduino devices to reset..."))
         self.labelElapsedtime.setText(_translate(
-            "MainWindow", "Elapsed time : 0 second"))
+            "MainWindow", "Elapsed time : - second"))
+        self.labelRMSValue.setText(_translate(
+            "MainWindow", "RMS Value : - volt"))
         self.startButton.setStatusTip(
             _translate("MainWindow",
                        "Display real-time electromyography signal (Spacebar)"))
@@ -357,23 +378,28 @@ class Ui_MainWindow(QtWidgets.QWidget):
         self.comboBoxPort.addItems(ports)
 
     # read emg input
-    def read_arduino_update(self, analog_input):
+    def read_arduino_update(self, analog_input, interval):
         analog_value = analog_input.read()
         if type(analog_value) == float:
             voltage_value = analog_value * (5.00 / 1.0)
+            # dataLength = len(Ui_MainWindow.rwdt)
+            # Ui_MainWindow.Xm[:-dataLength] = Ui_MainWindow.Xm[dataLength:]
+            # Ui_MainWindow.Ym[:-dataLength] = Ui_MainWindow.Ym[dataLength:]
             Ui_MainWindow.Xm[:-1] = Ui_MainWindow.Xm[1:]
+            Ui_MainWindow.Ym[:-1] = Ui_MainWindow.Ym[1:]
             emg_float = voltage_value
             # emg_float = round(
             #     (voltage_value * 1000
             #      + 172.4) / Ui_MainWindow.SENSORGAIN, 3)
-            Ui_MainWindow.Xm[-1] = emg_float
-            Ui_MainWindow.ptr += 1
-            self.curve1.setData(Ui_MainWindow.Xm)
-            self.curve1.setPos(Ui_MainWindow.ptr, 0)
+            Ui_MainWindow.Xm[-1] = interval
+            Ui_MainWindow.Ym[-1] = emg_float
+            # Ui_MainWindow.ptr += 1
+            self.curve1.setData(Ui_MainWindow.Xm, Ui_MainWindow.Ym)
+            # self.curve1.setPos(Ui_MainWindow.ptr, 0)
             QtWidgets.QApplication.processEvents()
             Ui_MainWindow.rwdt.append(emg_float)
-            Ui_MainWindow.dte.append(time.strftime("%d-%b-%Y"))
-            Ui_MainWindow.tme.append(time.strftime("%H:%M:%S"))
+            # Ui_MainWindow.dte.append(time.strftime("%d-%b-%Y"))
+            # Ui_MainWindow.tme.append(time.strftime("%H:%M:%S"))
 
     # measure sampling rate
     def sampling_rate(self):
@@ -429,23 +455,40 @@ class Ui_MainWindow(QtWidgets.QWidget):
         print("\n" + "Logging started.")
         self.start = time.time()
         while self.condition:
-            self.read_arduino_update(analog_input)
+            self.now = time.time()
+            self.interval = round(self.now - self.start, 2)
+            self.read_arduino_update(analog_input, self.interval)
             self.labelDataSample.setText(
                 " ".join(["Data Samples :",
                           str(len(Ui_MainWindow.rwdt)),
                           "samples received"])
             )
-            self.now = time.time()
+            Ui_MainWindow.tme.append(self.interval)
             self.labelElapsedtime.setText(
                 " ".join(["Elapsed Time :",
                           str("%.2f" % (self.now - self.start)),
                           "seconds"]))
+
         print("\n" + "Logging stopped.")
         self.end = time.time()
         self.T, self.sps = self.sampling_rate()
         self.y_f = self.filter_signal()
+        Ui_MainWindow.rmsVariable = format(self.calculate_root_mean_square(
+            Ui_MainWindow.rwdt), '.3f')
+        self.labelRMSValue.setText(
+            f"RMS Value : {Ui_MainWindow.rmsVariable} volt")
+        print(
+            f"\nRMS Value : {Ui_MainWindow.rmsVariable} volt")
 
-    # Set stop button
+    # Calculate root mean square
+
+    def calculate_root_mean_square(self, arr: array):
+        arr_length = len(arr)
+        rms_value = round(rmsValue(arr, arr_length), 3)
+        return rms_value
+
+        # Set stop button
+
     def stop_button(self):
         self.condition = 0
         self.stopButton.setEnabled(False)
@@ -455,7 +498,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         self.savePlotButton.setEnabled(True)
         self.singlePlotButton.setEnabled(True)
         self.fileName.setText(
-            "".join([time.strftime("%Y-%m-%d-%H.%M.%S"), "-data-"]))
+            "".join([time.strftime("%Y-%m-%d-%H.%M.%S"), "-"]))
         self.fileSelect_1.setEnabled(True)
         self.fileSelect_2.setEnabled(True)
         self.fileSelect_3.setEnabled(True)
@@ -470,15 +513,12 @@ class Ui_MainWindow(QtWidgets.QWidget):
         Ui_MainWindow.dte.clear()   # clear date data list
         Ui_MainWindow.tme.clear()   # clear time data list
         Ui_MainWindow.Xm = np.linspace(0, 0, Ui_MainWindow.windowWidth)
-        Ui_MainWindow.ptr = -Ui_MainWindow.windowWidth
-        self.curve1.setData(Ui_MainWindow.Xm)
-        self.curve1.setPos(Ui_MainWindow.ptr, 0)
-        self.labelDataSample.setText(
-            " ".join(["Data Samples :",
-                      str(len(Ui_MainWindow.rwdt)),
-                      "samples received"]))
+        Ui_MainWindow.Ym = np.linspace(0, 0, Ui_MainWindow.windowWidth)
+        self.curve1.setData(Ui_MainWindow.Xm, Ui_MainWindow.Ym)
+        self.labelDataSample.setText("Data Samples : - samples received")
         self.labelStatus.setText("Status : Signal plot cleared")
-        self.labelElapsedtime.setText("Elapsed time : 0 second")
+        self.labelElapsedtime.setText("Elapsed time : - second")
+        self.labelRMSValue.setText("RMS Value : - volt")
         self.startButton.setEnabled(True)
         self.clearButton.setEnabled(False)
         self.fileName.setEnabled(False)
@@ -496,17 +536,27 @@ class Ui_MainWindow(QtWidgets.QWidget):
         if not dirName:
             return
         filtered = self.y_f.tolist()
-        rowlist = list(zip(self.dte, self.tme, self.rwdt, filtered))
+        rowlist = list(zip(
+            # self.dte,
+            self.tme,
+            self.rwdt,
+            filtered))
 
         df = pd.DataFrame(rowlist,
-                          columns=['Date', 'Time',
-                                   'EMG Value (V)', 'Filtered Value (V)'])
-        new_row = {'Time': 'Retrieval Time (sec)',
-                   'Date': str("%.2f" % self.T),
-                   'EMG Value (V)': 'Total Samples',
-                   'Filtered Value (V)': self.n}
-        df = df.append(new_row, ignore_index=True)
-        df.set_index('Time', inplace=True)
+                          columns=[
+                              # 'Date',
+                              'Time (second)',
+                              'EMG Value (V)', 'Filtered Value (V)'])
+        # new_row = {'Time': 'Retrieval Time (sec)',
+        #            #    'Date': str("%.2f" % self.T),
+        #            'EMG Value (V)': 'Total Samples',
+        #            'Filtered Value (V)': self.n}
+        # df = df.append(new_row, ignore_index=True)
+        df.at[0, 'Retrieval Time (second)'] = str("%.2f" % self.T)
+        df.at[0, 'Total Samples'] = self.n
+        df.at[0, 'RMS Value'] = Ui_MainWindow.rmsVariable
+        df.at[0, 'Datetime'] = time.strftime("%Y-%m-%d-%H.%M.%S")
+        df.set_index('Time (second)', inplace=True)
         filename = self.fileName.text() + ".csv"
         df.to_csv("/".join([dirName, filename]))
         self.labelStatus.setText("Status : CSV File Saved")
@@ -552,36 +602,36 @@ class Ui_MainWindow(QtWidgets.QWidget):
         plt.gcf().canvas.manager.set_window_title('Single/Multiple Plot EMG Signals')
         if self.fileSelect_1.text() != "":
             dirName = self.fileSelect_1.text()
-            # csvName = dirName.split("/")
-            # print(csvName)
-            # print(dirName)
+            csvName = dirName.split("/")
             self.read_csv_files(dirName)
             plt.subplot(2, 1, 1)
             plt.plot(self.t_read, self.y_read,
-                     'r-', linewidth=1, label='Plot Signal 1')
+                     'r-', linewidth=1, label=f"Plot data 1: {csvName[-1]}")
             plt.subplot(2, 1, 2)
             plt.plot(self.t_read, self.yf_read, 'r-',
-                     linewidth=1, label='Plot Signal 1')
+                     linewidth=1, label=f"Plot data 1: {csvName[-1]}")
 
         if self.fileSelect_2.text() != "":
             dirName = self.fileSelect_2.text()
+            csvName = dirName.split("/")
             self.read_csv_files(dirName)
             plt.subplot(2, 1, 1)
             plt.plot(self.t_read, self.y_read,
-                     'g-', linewidth=1, label='Plot Signal 2')
+                     'g-', linewidth=1, label=f"Plot data 2: {csvName[-1]}")
             plt.subplot(2, 1, 2)
             plt.plot(self.t_read, self.yf_read, 'g-',
-                     linewidth=1, label='Plot Signal 2')
+                     linewidth=1, label=f"Plot data 2: {csvName[-1]}")
 
         if self.fileSelect_3.text() != "":
             dirName = self.fileSelect_3.text()
+            csvName = dirName.split("/")
             self.read_csv_files(dirName)
             plt.subplot(2, 1, 1)
             plt.plot(self.t_read, self.y_read,
-                     'b-', linewidth=1, label='Plot Signal 3')
+                     'b-', linewidth=1, label=f"Plot data 3: {csvName[-1]}")
             plt.subplot(2, 1, 2)
             plt.plot(self.t_read, self.yf_read, 'b-',
-                     linewidth=1, label='Plot Signal 3')
+                     linewidth=1, label=f"Plot data 3: {csvName[-1]}")
 
         plt.suptitle("EMG Signal")
         plt.subplot(2, 1, 1)
@@ -602,6 +652,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
         print("\nData plotted.")
 
     # Set Select File BUtton
+
     def select_file_button_1(self):
         self.labelStatus.setText("Status : Select CSV file to plot")
         fileName = QtWidgets.QFileDialog.getOpenFileName(
@@ -620,6 +671,7 @@ class Ui_MainWindow(QtWidgets.QWidget):
             'CSV file (*.csv)')
         self.fileSelect_2.setText(fileName[0])
         self.multiPlotButton.setEnabled(True)
+        print("\nSelected file: " + fileName[0])
 
     def select_file_button_3(self):
         self.labelStatus.setText("Status : Select CSV file to plot")
@@ -629,23 +681,24 @@ class Ui_MainWindow(QtWidgets.QWidget):
             'CSV file (*.csv)')
         self.fileSelect_3.setText(fileName[0])
         self.multiPlotButton.setEnabled(True)
+        print("\nSelected file: " + fileName[0])
 
     # read saved csv
     def read_csv_files(self, dirName):
         df = pd.read_csv(dirName)
         # read non filter`ed emg value column
         nonfilt_value = df["EMG Value (V)"]
-        nonfilt_value = nonfilt_value.drop(nonfilt_value.tail(1).index)
+        # nonfilt_value = nonfilt_value.drop(nonfilt_value.tail(1).index)
         nonfilt_value = nonfilt_value.astype(float)
         self.y_read = nonfilt_value.to_numpy()
         # read filtered emg value column
         filtered_value = df["Filtered Value (V)"]
-        filtered_value = filtered_value.drop(filtered_value.tail(1).index)
+        # filtered_value = filtered_value.drop(filtered_value.tail(1).index)
         self.yf_read = filtered_value.to_numpy()
         # read retrieval time from csv file
-        self.retrieval_time = float(df.iat[-1, -3])
+        self.retrieval_time = float(df.at[0, 'Retrieval Time (second)'])
         # read total sample from csv file
-        self.number_sample = int(df.iat[-1, -1])
+        self.number_sample = int(df.at[0, 'Total Samples'])
         self.t_read = np.linspace(
             0, self.retrieval_time, self.number_sample, endpoint=False)
 
